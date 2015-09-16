@@ -1,12 +1,62 @@
 'use strict';
 
 angular.module('stocks2App')
-  .controller('MainCtrl', function($scope, $timeout, $http, socket) {
+  .controller('MainCtrl', function($scope, $timeout, $http, socket, stocksFactory) {
+
+    function addStock(code) {
+      stocksFactory.getData(code)
+        .then(function(stockInfo) {
+          stockInfo.data.reverse();
+          console.log(stockInfo);
+          $scope.chartConfig.series.push(stockInfo);
+        }, function(error) {
+          console.error(error);
+        });
+    }
+
     $scope.awesomeThings = [];
 
     $http.get('/api/things').success(function(awesomeThings) {
       $scope.awesomeThings = awesomeThings;
-      socket.syncUpdates('thing', $scope.awesomeThings);
+
+      _.forEach($scope.awesomeThings, function(stock) { addStock(stock.name); });
+      //socket.syncUpdates('thing', $scope.awesomeThings);
+      socket.syncUpdates('thing', $scope.awesomeThings, function(event, item, object) {
+        console.log(event);
+        // event = "deleted" or "created"
+        console.log(item.name);
+        console.log(object);
+        $scope.awesomeThings = object;  // item contains the updated array
+
+        if (event === 'deleted') {
+          // remove item.name from $scope.chartConfig.series{name: }
+          _.remove($scope.chartConfig.series, function(series) {
+            //console.log("remove loop", series, item);
+            return series.name.toUpperCase() === item.name.toUpperCase();
+          });
+        }
+        else if (event === 'created') {
+          // download graph and add to chart
+          addStock(item.name);
+        }
+      });
+    });
+
+    $scope.$watch('awesomeThings', function() {
+       //alert('Dink!');
+       /*
+       _.forEach($scope.awesomeThings, function(stock) {
+         console.log('calling stocksFactory', stock.name);
+         stocksFactory.getData(stock.name)
+           .then(function(stockInfo) {
+             stockInfo.data.reverse();
+             console.log(stockInfo);
+             $scope.chartConfig.series.push(stockInfo);
+           }, function(error) {
+             console.error(error);
+           });
+       });
+       */
     });
 
     $scope.addThing = function() {
@@ -36,18 +86,21 @@ angular.module('stocks2App')
           enabled: true
         },
         navigator: {
-          enabled: true
+          enabled: false
         }
       },
       series: [],
-      title: {
-        text: 'Hello'
-      },
       useHighStocks: true
-    }
+    };
 
+
+    /*
+    $scope.chartConfig.series.push
+
+    /*
     $scope.chartConfig.series.push({
-        id: 1,
+        //id: 1,
+        name: "test1",
         data: [
           [1147651200000, 23.15],
           [1147737600000, 23.01],
@@ -63,7 +116,8 @@ angular.module('stocks2App')
           [1149033600000, 22.65]
         ]
       },   {
-        id: 2,
+        //id: 2,
+        name: "it's test 2",
         data: [
           [1147651200000, 25.15],
           [1147737600000, 25.01],
@@ -80,6 +134,6 @@ angular.module('stocks2App')
         ]
 
       }
-
     );
+    */
   });
